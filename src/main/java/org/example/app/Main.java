@@ -7,8 +7,9 @@ public class Main {
 
         String excelDataPath = "src/main/java/org/example/util/data/GRI_2017_2020_TEST.xlsx";
         String reportSavePath = "src/main/java/org/example/util/download";
+        String nameOfSavedReport = "Report";
 
-        ConverterService converter = new ConverterService(excelDataPath, reportSavePath);
+        ConverterService converter = new ConverterService(excelDataPath, reportSavePath, nameOfSavedReport);
         converter.executeProgram();
     }
 }

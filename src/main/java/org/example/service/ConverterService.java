@@ -17,13 +17,14 @@ public class ConverterService {
 
     private final List<ReportEntity> reportEntries = new ArrayList<>();
 
-    public ConverterService(String excelFilePath, String reportSaveDir) {
+    public ConverterService(String excelFilePath, String reportSaveDir, String nameOfSavedReport) {
         this.excelFilePath = excelFilePath;
         this.reportSaveDir = reportSaveDir;
-        this.reportFilePath = reportSaveDir + File.separator + "URL_Report.xlsx";
+        this.reportFilePath = reportSaveDir + File.separator + nameOfSavedReport+".xlsx";
 
     }
 
+    // TODO: SOLID/DRY/KISS
     // TODO: Indexes of downloaded pdfs are weird
     // TODO: Check for URL status code/is accessible
     // TODO: Check if URL is not too large
@@ -33,6 +34,8 @@ public class ConverterService {
     // TODO: Check if PDF is not encrypted
     // TODO: Limit threads
     // TODO: Add threading
+    // TODO: Krav spec
+    // TODO: Readme.md
 
     public void executeProgram() {
 
