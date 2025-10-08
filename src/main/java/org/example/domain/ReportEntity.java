@@ -15,13 +15,16 @@ public class ReportEntity {
     private String urlUsed;
     private String status;
     private String reason;
+    private String errorMessage;
 
     @Override
     public String toString() {
         return "ReportEntity{" +
-                "reason='" + reason + '\'' +
+                "errorMessage='" + errorMessage + '\'' +
                 ", url=" + url +
+                ", urlUsed='" + urlUsed + '\'' +
                 ", status='" + status + '\'' +
+                ", reason='" + reason + '\'' +
                 '}';
     }
 }
