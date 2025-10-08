@@ -7,7 +7,9 @@ import org.example.domain.ReportEntity;
 import java.io.*;
 import java.net.URL;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 public class ConverterService {
 
@@ -20,11 +22,12 @@ public class ConverterService {
     public ConverterService(String excelFilePath, String reportSaveDir, String nameOfSavedReport) {
         this.excelFilePath = excelFilePath;
         this.reportSaveDir = reportSaveDir;
-        this.reportFilePath = reportSaveDir + File.separator + nameOfSavedReport+".xlsx";
+        this.reportFilePath = reportSaveDir + File.separator + nameOfSavedReport + ".xlsx";
 
     }
 
     // TODO: SOLID/DRY/KISS
+    // TODO: Connection Timeout for reading URL
     // TODO: Indexes of downloaded pdfs are weird
     // TODO: Check for URL status code/is accessible
     // TODO: Check if URL is not too large
@@ -42,9 +45,43 @@ public class ConverterService {
         System.out.println("=========================================");
         System.out.println("Executing program...");
 
+        // idempotent - create report only if it does not exist
         createReport();
-        getURLFromExcel();
-        updateReport();
+
+        // load existing BRnums from report to avoid duplicates
+        Set<String> existing = loadExistingBRnums();
+
+        // read Excel and populate reportEntries, skipping existing BRnums
+        getURLFromExcel(existing);
+
+        if (!reportEntries.isEmpty()) {
+            updateReport();
+        } else {
+            System.out.println("No new entries to update in the report.");
+        }
+    }
+
+    private Set<String> loadExistingBRnums() {
+        Set<String> res = new HashSet<>();
+        File reportFile = new File(reportFilePath);
+        if (!reportFile.exists()) return res;
+
+        try (FileInputStream fis = new FileInputStream(reportFile);
+             Workbook wb = new XSSFWorkbook(fis)) {
+            Sheet sheet = wb.getSheet("Report");
+            if (sheet == null) sheet = wb.getSheetAt(0);
+            for (int r = 1; r <= sheet.getLastRowNum(); r++) {
+                Row row = sheet.getRow(r);
+                if (row == null) continue;
+                Cell brCell = row.getCell(0);
+                if (brCell == null) continue;
+                String br = brCell.getStringCellValue();
+                if (br != null && !br.isBlank()) res.add(br.trim());
+            }
+        } catch (IOException e) {
+            throw new RuntimeException("Failed reading existing BRnums", e);
+        }
+        return res;
     }
 
     /*
@@ -54,122 +91,88 @@ public class ConverterService {
     If the download fails and "Report Html Address" is provided, attempt to download from there
     Save the downloaded PDFs to the specified directory
      */
-    public void getURLFromExcel() {
-
+    public void getURLFromExcel(Set<String> existingBRnums) {
         System.out.println("=========================================");
-        System.out.println("Get URLS from excel file...");
+        System.out.println("Get URLs from excel file...");
 
-        // Open the Excel file
-        try (FileInputStream fis = new FileInputStream(excelFilePath)) {
+        try (FileInputStream fis = new FileInputStream(excelFilePath);
+             Workbook workbook = new XSSFWorkbook(fis)) {
 
-            // Create Workbook instance for XLSX file
-            Workbook workbook = new XSSFWorkbook(fis);
-
-            // Get the first sheet
             Sheet sheet = workbook.getSheetAt(0);
+            if (sheet == null || sheet.getPhysicalNumberOfRows() <= 1) return;
 
-            // check if sheet is empty
-            if (sheet == null || sheet.getPhysicalNumberOfRows() < 0) return;
-
-            // get header row
             Row headerRow = sheet.getRow(0);
             if (headerRow == null) return;
 
-            // find specified columns
             Integer pdfCol = null, htmlCol = null;
-
-            // loop through header row to find the columns (pdf and html)
             for (int c = 0; c < headerRow.getLastCellNum(); c++) {
-
-                // read cell value
                 Cell h = headerRow.getCell(c);
                 String name = h != null ? h.getStringCellValue() : null;
-
-                // check if it matches the specified column names
                 if ("Pdf_URL".equalsIgnoreCase(name)) pdfCol = c;
                 if ("Report Html Address".equalsIgnoreCase(name)) htmlCol = c;
             }
-
-            // if pdf column is not found, exit
             if (pdfCol == null) return;
 
+            DataFormatter fmt = new DataFormatter();
 
-            // loop through rows and process each URL
-            DataFormatter formatter = new DataFormatter();
-
-            // start from row 1 (skip header)
             for (int r = 1; r <= sheet.getLastRowNum(); r++) {
-
-                // get row
                 Row row = sheet.getRow(r);
-
-                // skip empty rows
                 if (row == null || isRowBlank(row)) continue;
 
-                // define URL variables
-                URL pdfUrl, htmlUrl = null;
-                String BRnum = null;
-
-
-                //add BRnum to report - acts as an identifier
+                String br;
                 Cell brCell = row.getCell(0);
-                if (brCell != null) {
-                    BRnum = formatter.formatCellValue(brCell).trim();
-                    ReportEntity.builder().BRnum(BRnum).build();
+                if (brCell != null) br = fmt.formatCellValue(brCell).trim();
+                else {
+                    br = null;
                 }
 
+                // skip duplicates
+                if (br != null && !br.isBlank() && existingBRnums.contains(br)) {
 
-                // read pdf url
+                    //remove from reportEntries if already exists
+                    reportEntries.removeIf(entry -> br.equals(entry.getBRnum()));
+                    System.out.println("Skipping duplicate BRnum: " + br + " at row " + (r + 1));
+                    continue;
+                }
+
+                URL pdfUrl, htmlUrl = null;
+
+                String pdfStr = "";
                 Cell pdfCell = row.getCell(pdfCol);
-                String pdfStr = pdfCell != null ? formatter.formatCellValue(pdfCell).trim() : "";
+                if (pdfCell != null) pdfStr = fmt.formatCellValue(pdfCell).trim();
 
-                // check if empty
                 if (pdfStr.isEmpty()) {
-                    // empty cell
                     reportEntries.add(ReportEntity.builder()
-                            .BRnum(BRnum)
-                            .url(null)
-                            .status("error")
-                            .reason("missing PDF url at row " + (r + 1))
-                            .build());
+                            .BRnum(br).status("error").reason("missing PDF url at row " + (r + 1)).build());
                     continue;
                 }
                 try {
                     pdfUrl = new URL(pdfStr);
-
                 } catch (Exception e) {
-                    // invalid URL
                     reportEntries.add(ReportEntity.builder()
-                            .BRnum(BRnum)
-                            .urlUsed("First URL")
-                            .status("error")
-                            .reason("invalid PDF url at row " + (r + 1) + ": " + pdfStr)
-                            .build());
+                            .BRnum(br).urlUsed("First URL").status("error")
+                            .reason("invalid PDF url at row " + (r + 1) + ": " + pdfStr).build());
                     continue;
                 }
 
-                // read html url if available
                 if (htmlCol != null) {
                     Cell htmlCell = row.getCell(htmlCol);
-                    String htmlStr = htmlCell != null ? formatter.formatCellValue(htmlCell).trim() : "";
-
-                    //
+                    String htmlStr = htmlCell != null ? fmt.formatCellValue(htmlCell).trim() : "";
                     if (!htmlStr.isEmpty()) {
                         try {
                             htmlUrl = new URL(htmlStr);
-                        } catch (Exception e) {
-                            System.out.println("Invalid HTML URL at row " + (r + 1) + ": " + htmlStr);
+                        } catch (Exception ignored) {
                         }
                     }
                 }
-                // download pdf
-                downloadPDF(BRnum, pdfUrl, htmlUrl, "file" + "_" + (r + 1) + ".pdf");
+
+                downloadPDF(br, pdfUrl, htmlUrl, "file" + "_" + (r - 1 + 1) + ".pdf");
             }
-        } catch (
-                IOException e) {
+        } catch (IOException e) {
             throw new RuntimeException(e);
         }
     }
+
 
     /*
     Check if a row is blank (all cells are empty or null)
@@ -228,16 +231,22 @@ public class ConverterService {
     Return the InputStream of the successfully opened URL
     If both URLs fail, throw an IOException
      */
-    private InputStream tryOpen(String BRnum, URL url1, URL url2, ReportEntity.ReportEntityBuilder b) throws IOException {
-
+    private InputStream tryOpen(String br, URL url1, URL url2, ReportEntity.ReportEntityBuilder b) throws IOException {
         try {
+            b.url(url1).urlUsed("First URL");
             return url1.openStream();
-        } catch (IOException e) {
-            if (url2 == null) throw new IOException("both URLs failed");
-            b.BRnum(BRnum).url(url2).urlUsed("Second URL").status("error").reason("download failed - both URLs tried");
-            return url2.openStream();
+        } catch (IOException first) {
+            if (url2 == null) throw new IOException("first URL failed and no fallback", first);
+            try {
+                b.url(url2).urlUsed("Second URL");
+                return url2.openStream();
+            } catch (IOException second) {
+                b.BRnum(br).status("error").reason("both URLs failed");
+                throw new IOException("both URLs failed", second);
+            }
         }
     }
+
 
     /*
     Create a new Excel report file to log the results of the PDF downloads
@@ -319,6 +328,12 @@ public class ConverterService {
 
         System.out.println("=========================================");
         System.out.println("Updating report file...");
+
+        // check for empty report entries
+        if (reportEntries.isEmpty()) {
+            System.out.println("No new report entries to update.");
+            return;
+        }
 
         // check if report file exists
         File reportFile = new File(reportFilePath);
