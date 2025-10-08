@@ -5,11 +5,10 @@ import org.example.service.ConverterService;
 public class Main {
     public static void main(String[] args) {
 
-        String excelDataPath = "C:\\Specialisterne - Opgaver\\Uge 4\\data\\GRI_2017_2020_TEST.xlsx";
-        String reportSavePath = System.getProperty("user.home") + "\\Downloads\\test";
+        String excelDataPath = "src/main/java/org/example/util/data/GRI_2017_2020_TEST.xlsx";
+        String reportSavePath = "src/main/java/org/example/util/download";
 
         ConverterService converter = new ConverterService(excelDataPath, reportSavePath);
         converter.executeProgram();
-
     }
 }

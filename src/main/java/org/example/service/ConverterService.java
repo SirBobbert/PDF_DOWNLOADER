@@ -24,6 +24,7 @@ public class ConverterService {
 
     }
 
+    // TODO: Indexes of downloaded pdfs are weird
     // TODO: Check for URL status code/is accessible
     // TODO: Check if URL is not too large
     // TODO: Check if URL is corrupted
@@ -104,6 +105,16 @@ public class ConverterService {
 
                 // define URL variables
                 URL pdfUrl, htmlUrl = null;
+                String BRnum = null;
+
+
+                //add BRnum to report - acts as an identifier
+                Cell brCell = row.getCell(0);
+                if (brCell != null) {
+                    BRnum = formatter.formatCellValue(brCell).trim();
+                    ReportEntity.builder().BRnum(BRnum).build();
+                }
+
 
                 // read pdf url
                 Cell pdfCell = row.getCell(pdfCol);
@@ -113,6 +124,7 @@ public class ConverterService {
                 if (pdfStr.isEmpty()) {
                     // empty cell
                     reportEntries.add(ReportEntity.builder()
+                            .BRnum(BRnum)
                             .url(null)
                             .status("error")
                             .reason("missing PDF url at row " + (r + 1))
@@ -125,6 +137,7 @@ public class ConverterService {
                 } catch (Exception e) {
                     // invalid URL
                     reportEntries.add(ReportEntity.builder()
+                            .BRnum(BRnum)
                             .urlUsed("First URL")
                             .status("error")
                             .reason("invalid PDF url at row " + (r + 1) + ": " + pdfStr)
@@ -147,7 +160,7 @@ public class ConverterService {
                     }
                 }
                 // download pdf
-                downloadPDF(pdfUrl, htmlUrl, "file" + "_" + (r + 1) + ".pdf");
+                downloadPDF(BRnum, pdfUrl, htmlUrl, "file" + "_" + (r + 1) + ".pdf");
             }
         } catch (
                 IOException e) {
@@ -175,7 +188,7 @@ public class ConverterService {
     If the download from the first URL fails and a second URL is provided, attempt to download from there
     Save the downloaded PDF to the specified directory with the given file name
      */
-    public void downloadPDF(URL urlStr1, URL urlStr2, String fileName) {
+    public void downloadPDF(String BRnum, URL urlStr1, URL urlStr2, String fileName) {
 
         System.out.println("=========================================");
         System.out.println("Opening connection to download the PDF...");
@@ -187,19 +200,19 @@ public class ConverterService {
         String downloadsPath = reportSaveDir + File.separator + fileName;
 
         // try to download the PDF
-        try (InputStream in = tryOpen(urlStr1, urlStr2, b);
+        try (InputStream in = tryOpen(BRnum, urlStr1, urlStr2, b);
              // create output stream to save the file
              FileOutputStream fos = new FileOutputStream(downloadsPath)) {
 
             // read from input stream and write to output stream
             byte[] buf = new byte[8192];
             for (int n; (n = in.read(buf)) != -1; ) fos.write(buf, 0, n);
-            b.status("success");
+            b.BRnum(BRnum).status("success");
             System.out.println("PDF downloaded successfully!");
 
         } catch (Exception e) {
+            b.BRnum(BRnum).status("error").errorMessage("Failed to download PDF: " + e.getMessage());
             System.out.println("Failed to download PDF: " + e.getMessage());
-            b.status("error").errorMessage(e.getMessage());
         }
 
         // add entry to report list
@@ -212,19 +225,16 @@ public class ConverterService {
     Return the InputStream of the successfully opened URL
     If both URLs fail, throw an IOException
      */
-    private InputStream tryOpen(URL url1, URL url2, ReportEntity.ReportEntityBuilder b) throws IOException {
+    private InputStream tryOpen(String BRnum, URL url1, URL url2, ReportEntity.ReportEntityBuilder b) throws IOException {
 
         try {
             return url1.openStream();
         } catch (IOException e) {
             if (url2 == null) throw new IOException("both URLs failed");
-            b.url(url2).urlUsed("Second URL");
-            b.status("error");
-            b.reason("download failed - both URLs tried");
+            b.BRnum(BRnum).url(url2).urlUsed("Second URL").status("error").reason("download failed - both URLs tried");
             return url2.openStream();
         }
     }
-
 
     /*
     Create a new Excel report file to log the results of the PDF downloads
@@ -280,7 +290,7 @@ public class ConverterService {
                 headerCellStyle.setFillPattern(FillPatternType.SOLID_FOREGROUND);
 
                 // create header cells
-                String[] headers = {"URL", "URL Used", "Status", "Reason", "Error Message"};
+                String[] headers = {"BRnum", "URL", "URL Used", "Status", "Reason", "Error Message"};
                 for (int i = 0; i < headers.length; i++) {
                     Cell cell = headerRow.createCell(i);
                     cell.setCellValue(headers[i]);
@@ -328,18 +338,19 @@ public class ConverterService {
             int lastRowNum = sheet.getLastRowNum();
             for (ReportEntity entry : reportEntries) {
                 Row row = sheet.createRow(++lastRowNum);
-                row.createCell(0).setCellValue(entry.getUrl() != null ? entry.getUrl().toString() : "");
-                row.createCell(1).setCellValue(entry.getUrlUsed() != null ? entry.getUrlUsed() : "");
-                row.createCell(2).setCellValue(entry.getStatus() != null ? entry.getStatus() : "");
-                row.createCell(3).setCellValue(entry.getReason() != null ? entry.getReason() : "");
-                row.createCell(4).setCellValue(entry.getErrorMessage() != null ? entry.getErrorMessage() : "");
+                row.createCell(0).setCellValue(entry.getBRnum() != null ? entry.getBRnum() : "");
+                row.createCell(1).setCellValue(entry.getUrl() != null ? entry.getUrl().toString() : "");
+                row.createCell(2).setCellValue(entry.getUrlUsed() != null ? entry.getUrlUsed() : "");
+                row.createCell(3).setCellValue(entry.getStatus() != null ? entry.getStatus() : "");
+                row.createCell(4).setCellValue(entry.getReason() != null ? entry.getReason() : "");
+                row.createCell(5).setCellValue(entry.getErrorMessage() != null ? entry.getErrorMessage() : "");
             }
 
             // write changes back to the file
             try (FileOutputStream fos = new FileOutputStream(reportFile)) {
 
                 // auto-size columns
-                for (int c = 0; c < 5; c++) {
+                for (int c = 0; c < 6; c++) {
                     sheet.autoSizeColumn(c);
                     sheet.setColumnWidth(c, sheet.getColumnWidth(c) + 1250);
                 }

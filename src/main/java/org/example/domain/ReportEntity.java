@@ -11,6 +11,7 @@ import java.net.URL;
 @Setter
 public class ReportEntity {
 
+    private String BRnum;
     private URL url;
     private String urlUsed;
     private String status;
@@ -20,11 +21,12 @@ public class ReportEntity {
     @Override
     public String toString() {
         return "ReportEntity{" +
-                "errorMessage='" + errorMessage + '\'' +
+                "BRnum='" + BRnum + '\'' +
                 ", url=" + url +
                 ", urlUsed='" + urlUsed + '\'' +
                 ", status='" + status + '\'' +
                 ", reason='" + reason + '\'' +
+                ", errorMessage='" + errorMessage + '\'' +
                 '}';
     }
 }

@@ -32,6 +32,38 @@
         </list>
       </option>
     </inspection_tool>
+    <inspection_tool class="SpellCheckingInspection" enabled="false" level="TYPO" enabled_by_default="false">
+      <option name="processCode" value="true" />
+      <option name="processLiterals" value="true" />
+      <option name="processComments" value="true" />
+    </inspection_tool>
     <inspection_tool class="UrlHashCode" enabled="false" level="WARNING" enabled_by_default="false" />
+    <inspection_tool class="VulnerableLibrariesLocal" enabled="true" level="WARNING" enabled_by_default="true">
+      <option name="isIgnoringEnabled" value="true" />
+      <option name="ignoredModules">
+        <list>
+          <option value="PDF_DOWNLOADER" />
+          <option value="PDF_DOWNLOADER" />
+          <option value="PDF_DOWNLOADER" />
+          <option value="PDF_DOWNLOADER" />
+        </list>
+      </option>
+      <option name="ignoredPackages">
+        <list>
+          <option value="org.apache.poi:poi-ooxml:5.3.0" />
+          <option value="commons-beanutils:commons-beanutils:1.9.3" />
+          <option value="ch.qos.logback:logback-core:1.2.3" />
+          <option value="log4j:log4j:1.2.14" />
+        </list>
+      </option>
+      <option name="ignoredReasons">
+        <list>
+          <option value="Not exploitable" />
+          <option value="Not exploitable" />
+          <option value="Not exploitable" />
+          <option value="asdsa" />
+        </list>
+      </option>
+    </inspection_tool>
   </profile>
 </component>
