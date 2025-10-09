@@ -1,24 +1,63 @@
+<!-- src/main/resources/logback.xml -->
 <configuration>
-    <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
+
+    <!-- Common bit of the line (without level color) -->
+    <property name="BASE_PATTERN"
+              value="%n%d{HH:mm:ss.SSS} | %s | #%X{seq:-}-[%X{br:-}] | %cyan(%thread) | %magenta(%logger{28}) - %replace(%msg){'(.{80})(?=\\S)','$1%n ' }%n"/>
+
+    <!-- INFO/DEBUG/TRACE: keep Logback's default highlight -->
+    <appender name="STDOUT_DEFAULT" class="ch.qos.logback.core.ConsoleAppender">
         <encoder>
-            <!-- tid | tråd | farvet level | kort logger | besked + newline -->
-            <pattern>%d{HH:mm:ss} [%thread] %highlight(%-5level) %logger{36} - %msg%n</pattern>
+            <pattern>%n%d{HH:mm:ss.SSS} | %highlight(%-5level) | #%X{seq:-}-[%X{br:-}] | %cyan(%thread) | %magenta(%logger{28}) - %replace(%msg){'(.{80})(?=\\S)','$1%n ' }%n</pattern>
         </encoder>
+        <filter class="ch.qos.logback.classic.filter.LevelFilter">
+            <level>WARN</level>
+            <onMatch>DENY</onMatch>
+            <onMismatch>NEUTRAL</onMismatch>
+        </filter>
+        <filter class="ch.qos.logback.classic.filter.LevelFilter">
+            <level>ERROR</level>
+            <onMatch>DENY</onMatch>
+            <onMismatch>NEUTRAL</onMismatch>
+        </filter>
     </appender>
 
+    <!-- WARN: force yellow -->
+    <appender name="STDOUT_WARN" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>%n%d{HH:mm:ss.SSS} | %yellow(%-5level) | #%X{seq:-}-[%X{br:-}] | %cyan(%thread) | %magenta(%logger{28}) - %replace(%msg){'(.{80})(?=\\S)','$1%n ' }%n</pattern>
+        </encoder>
+        <filter class="ch.qos.logback.classic.filter.LevelFilter">
+            <level>WARN</level>
+            <onMatch>ACCEPT</onMatch>
+            <onMismatch>DENY</onMismatch>
+        </filter>
+    </appender>
+
+    <!-- ERROR: force red (bold) -->
+    <appender name="STDOUT_ERROR" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>%n%d{HH:mm:ss.SSS} | %boldRed(%-5level) | #%X{seq:-}-[%X{br:-}] | %cyan(%thread) | %magenta(%logger{28}) - %replace(%msg){'(.{80})(?=\\S)','$1%n ' }%n</pattern>
+        </encoder>
+        <filter class="ch.qos.logback.classic.filter.LevelFilter">
+            <level>ERROR</level>
+            <onMatch>ACCEPT</onMatch>
+            <onMismatch>DENY</onMismatch>
+        </filter>
+    </appender>
+
+    <!-- Quiet 3rd-party libs -->
     <logger name="org.apache.poi" level="WARN"/>
     <logger name="org.jxls" level="WARN"/>
     <logger name="org.apache.commons" level="WARN"/>
 
-    <!-- Vores egne pakker: normalt INFO. Skift til DEBUG ved behov -->
-    <logger name="org.example.service.downloader" level="INFO"/>
+    <!-- Your code -->
     <logger name="org.example.service.core" level="INFO"/>
+    <logger name="org.example.service.downloader" level="INFO"/>
 
     <root level="INFO">
-        <appender-ref ref="STDOUT"/>
+        <appender-ref ref="STDOUT_DEFAULT"/>
+        <appender-ref ref="STDOUT_WARN"/>
+        <appender-ref ref="STDOUT_ERROR"/>
     </root>
-
-    <root level="WARN">…</root>
-    <logger name="org.example.service.core" level="INFO"/>
-    <logger name="org.example.service.downloader" level="INFO"/>
 </configuration>

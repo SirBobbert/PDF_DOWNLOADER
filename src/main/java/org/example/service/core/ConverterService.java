@@ -1,5 +1,6 @@
 package org.example.service.core;
 
+import org.slf4j.MDC;
 import org.example.domain.ReportEntity;
 import org.example.service.downloader.PdfDownloader;
 import org.example.service.reader.ExcelReader;
@@ -7,10 +8,10 @@ import org.example.service.report.ReportRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 import java.nio.file.Path;
+import java.util.concurrent.TimeUnit;
 
 /**
  * ------------------------------------------------------------------------------------------------
@@ -82,89 +83,136 @@ public class ConverterService {
      */
     public void executeProgram() {
 
-        long startNs = System.nanoTime();
-        int ok = 0, fail = 0;
+        MDC.put("tid", String.valueOf(Thread.currentThread().threadId()));
+        MDC.put("seq", "-");
+        MDC.put("br", "-");
 
-        log.info("Checking if report exists at: {}", reportFile);
-        reportRepository.ensureReport(reportFile);
+        try {
 
-        Set<String> existing = reportRepository.loadExistingBRnums(reportFile);
-        log.info("Found {} existing BRnums in report", existing.size());
 
-        List<ExcelReader.InputRow> all = excelReader.readRows(excelPath);
-        log.info("Loaded {} rows from Excel file", all.size());
+            // timing + counters
+            long startNs = System.nanoTime();
+            int ok = 0, fail = 0;
 
-        // worklist = rows that have at least one URL (primary or backup)
-        List<ExcelReader.InputRow> work = all.stream()
-                .filter(r -> r.pdfUrl() != null || r.htmlUrl() != null)
-                .toList();
-        int total = work.size();
-        log.info("Prepared {} rows with at least one URL", total);
+            log.info("Checking if report exists at: {}", reportFile);
+            reportRepository.ensureReport(reportFile);
 
-        List<ReportEntity> toAppend = new ArrayList<>();
-        int i = 0;
+            Set<String> existing = reportRepository.loadExistingBRnums(reportFile);
+            log.info("Found {} existing BRnums in report", existing.size());
 
-        for (ExcelReader.InputRow row : work) {
-            if (row.BRnum() != null && existing.contains(row.BRnum())) {
-                log.warn("[DUPLICATE] Skipping BRnum={} (row {})", row.BRnum(), row.rowIndex());
-                continue;
+            List<ExcelReader.InputRow> all = excelReader.readRows(excelPath);
+            log.info("Loaded {} rows from Excel file", all.size());
+
+            // Filter to rows that have a URL and are not duplicates
+            List<ExcelReader.InputRow> work = all.stream()
+                    .filter(r -> (r.pdfUrl() != null || r.htmlUrl() != null)
+                            && (r.BRnum() == null || !existing.contains(r.BRnum())))
+                    .toList();
+            int total = work.size();
+            log.info("Prepared {} rows with at least one URL", total);
+
+            // create a bounded thread pool (tweakable size)
+            int poolSize = Math.max(4, Math.min(6, Runtime.getRuntime().availableProcessors()));
+            log.info("Using download thread pool size: {}", poolSize);
+
+            var pool = (java.util.concurrent.ThreadPoolExecutor)
+                    java.util.concurrent.Executors.newFixedThreadPool(poolSize, r -> {
+                        Thread t = new Thread(r);
+                        t.setName("dl-" + t.threadId());
+
+                        log.info("======================= Creating thread: {} =======================", t.getName());
+
+                        t.setUncaughtExceptionHandler((th, ex) ->
+                                log.error("Uncaught in {}: {}", th.getName(), ex.toString(), ex));
+                        return t;
+                    });
+
+            try {
+                // submit tasks
+                List<java.util.concurrent.Future<ReportEntity>> futures = new java.util.ArrayList<>();
+                for (int i = 0; i < work.size(); i++) {
+                    var row = work.get(i);
+                    var seq = i + 1;
+                    log.info("({}/{}) BRnum={} | row={} | preparing download...", seq, total, row.BRnum(), row.rowIndex());
+                    Path target = downloadDir.resolve("file_" + seq + ".pdf");
+                    futures.add(pool.submit(new DownloadTask(seq, row, target, pdfDownloader)));
+                }
+
+                // wait for completion and collect results
+                List<ReportEntity> toAppend = new java.util.ArrayList<>();
+                for (int i = 0; i < futures.size(); i++) {
+                    try {
+                        ReportEntity re = futures.get(i).get(); // waits for each task
+                        toAppend.add(re);
+                        if ("success".equalsIgnoreCase(re.getStatus())) {
+                            ok++;
+                            log.info("({}/{}) BRnum={} | SUCCESS -> {}", i + 1, total, re.getBRnum(),
+                                    re.getUrl() != null ? re.getUrl() : "(no URL)");
+                        } else {
+                            fail++;
+                            log.error("({}/{}) BRnum={} | FAILED -> {}", i + 1, total, re.getBRnum(),
+                                    re.getErrorMessage() != null ? re.getErrorMessage() : re.getReason());
+                        }
+                    } catch (Exception e) {
+                        fail++;
+                        log.error("({}/{}) UNCAUGHT task failure -> {}", i + 1, total, e.getMessage());
+                    }
+                }
+
+                // append results (if any)
+                if (!toAppend.isEmpty()) {
+                    log.info("[REPORT] Appending {} new entries...", toAppend.size());
+                    reportRepository.append(reportFile, toAppend);
+                    log.info("[REPORT] Done.");
+                } else {
+                    log.info("[REPORT] No new entries to update.");
+                }
+
+            } finally {
+                // shutdown pool
+                log.info("Shutting down thread pool...");
+                pool.shutdown();
+                try {
+                    if (!pool.awaitTermination(60, TimeUnit.SECONDS)) {
+                        pool.shutdownNow();
+                        if (!pool.awaitTermination(10, TimeUnit.SECONDS)) {
+                            log.warn("Pool did not terminate cleanly");
+                        }
+                    }
+                } catch (InterruptedException ie) {
+                    pool.shutdownNow();
+                    Thread.currentThread().interrupt(); // her
+                    log.warn("Interrupted while awaiting termination", ie);
+                }
             }
-            if (row.BRnum() == null || row.BRnum().isBlank()) {
-                log.warn("[INPUT] Row {} has empty BRnum", row.rowIndex());
-            }
 
-            i++;
-            log.info("({}/{}) BRnum={} | row={} | preparing download...", i, total, row.BRnum(), row.rowIndex());
+            // execution start to finish in ms
+            long durMs = (System.nanoTime() - startNs) / 1_000_000L;
+            double durSec = durMs / 1000.0;
 
-            var target = downloadDir.resolve("file_" + i + ".pdf");
-            var result = pdfDownloader.download(row.BRnum(), row.pdfUrl(), row.htmlUrl(), target);
-
-            String label = "";
-            if (result.urlUsed() != null) {
-                if (row.pdfUrl() != null && result.urlUsed().equals(row.pdfUrl())) label = "Primary URL";
-                else label = "Backup URL";
-            }
-
-            toAppend.add(ReportEntity.builder()
-                    .BRnum(row.BRnum())
-                    .url(result.urlUsed())
-                    .urlUsed(label)
-                    .status(result.success() ? "success" : "error")
-                    .reason(result.reason())
-                    .errorMessage(result.errorMessage())
-                    .build());
-
-            if (result.success()) ok++;
-            else fail++;
-
-            if (result.success()) {
-                log.info("({}/{}) BRnum={} | SUCCESS -> {}", i, total, row.BRnum(),
-                        result.urlUsed() != null ? result.urlUsed() : "(no URL)");
-            } else {
-                log.error("({}/{}) BRnum={} | FAILED -> {}", i, total, row.BRnum(),
-                        result.errorMessage() != null ? result.errorMessage() : result.reason());
-            }
+            log.info("""
+                            \n
+                            ===============================================================================
+                            ✅ Finished PDF run
+                            - Max threads allowed     : {}
+                            - Threads actually spawned: {}
+                            - Total rows considered   : {}
+                            - Downloads succeeded     : {}
+                            - Downloads failed        : {}
+                            - Elapsed                 : {} ms
+                            - Report path             : {}
+                            ===============================================================================
+                            """,
+                    poolSize,
+                    pool.getLargestPoolSize(),
+                    ok + fail,
+                    ok,
+                    fail,
+                    durSec,
+                    reportFile
+            );
+        } finally {
+            MDC.clear();
         }
-
-        if (!toAppend.isEmpty()) {
-            log.info("[REPORT] Appending {} new entries...", toAppend.size());
-            reportRepository.append(reportFile, toAppend);
-            log.info("[REPORT] Done.");
-        } else {
-            log.info("[REPORT] No new entries to update.");
-        }
-
-        System.out.println("=============================================================================\n");
-        long durMs = (System.nanoTime() - startNs) / 1_000_000L;
-        log.info("""
-                ✅ Finished PDF run
-                - Total rows considered : {}
-                - Downloads succeeded   : {}
-                - Downloads failed      : {}
-                - Elapsed               : {} ms
-                Report path             : {}
-                """, ok + fail, ok, fail, durMs, reportFile);
-        System.out.println("=============================================================================");
     }
-
 }

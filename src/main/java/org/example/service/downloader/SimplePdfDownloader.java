@@ -54,12 +54,16 @@ public class SimplePdfDownloader implements PdfDownloader {
                 long ms = (System.nanoTime() - start) / 1_000_000;
                 String type = te.getMessage() != null && te.getMessage().toLowerCase().contains("connect")
                         ? "Connection timeout" : "Read timeout";
-                log.error("BRnum={} | {} after {} s on {}", brNum, type, ms / 1000.0, url);
+                log.error("BRnum={} | {} after {} s on {} ({})",
+                        brNum, type, ms / 1000.0,
+                        labelFor(url, primary) + "=" + shortUrl(url),
+                        te.getMessage());
                 lastError = te;
 
             } catch (IOException e) {
                 long ms = (System.nanoTime() - start) / 1_000_000;
-                log.warn("BRnum={} | FAILED on {} after {} s ({})", brNum, url, ms / 1000.0, e.getMessage());
+                log.warn("BRnum={} | FAILED on {}={} after {} s ({})",
+                        brNum, labelFor(url, primary), shortUrl(url), ms / 1000.0, e.getMessage());
                 lastError = e;
             }
         }
@@ -84,4 +88,16 @@ public class SimplePdfDownloader implements PdfDownloader {
         }
         return conn.getInputStream();
     }
+
+    private static String labelFor(URL candidate, URL primary) {
+        if (candidate == null) return "(null)";
+        return candidate.equals(primary) ? "Pdf_URL" : "Html_URL";
+    }
+
+    private static String shortUrl(URL u) {
+        if (u == null) return "(null)";
+        String s = u.toString();
+        return s.length() <= 120 ? s : s.substring(0, 117) + "...";
+    }
+
 }
