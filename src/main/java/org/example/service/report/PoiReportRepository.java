@@ -1,9 +1,6 @@
 package org.example.service.report;
 
-import org.apache.poi.ss.usermodel.Cell;
-import org.apache.poi.ss.usermodel.Row;
-import org.apache.poi.ss.usermodel.Sheet;
-import org.apache.poi.ss.usermodel.Workbook;
+import org.apache.poi.ss.usermodel.*;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.example.domain.ReportEntity;
 
@@ -32,10 +29,38 @@ public class PoiReportRepository implements ReportRepository {
             try (Workbook wb = new XSSFWorkbook()) {
                 Sheet sheet = wb.createSheet("Report");
                 Row header = sheet.createRow(0);
-                String[] headers = {"BRnum", "URL", "URL Used", "Status", "Reason", "Error Message"};
 
+
+                // header font
+                Font headerFont = wb.createFont();
+                headerFont.setFontName("Arial");
+                headerFont.setFontHeightInPoints((short) 14);
+                headerFont.setBold(true);
+
+                // header styling
+                CellStyle headerStyle = wb.createCellStyle();
+                headerStyle.setFont(headerFont);
+
+                // header background
+                headerStyle.setFillForegroundColor(IndexedColors.GREY_25_PERCENT.getIndex());
+                headerStyle.setFillPattern(FillPatternType.SOLID_FOREGROUND);
+
+                // header borders
+                headerStyle.setBorderBottom(BorderStyle.THIN);
+                headerStyle.setBorderTop(BorderStyle.THIN);
+                headerStyle.setBorderLeft(BorderStyle.THIN);
+                headerStyle.setBorderRight(BorderStyle.THIN);
+
+                String[] headers = {"BRnum", "URL", "URL Used", "Status", "Reason", "Error"};
                 for (int i = 0; i < headers.length; i++) {
-                    header.createCell(i).setCellValue(headers[i]);
+                    Cell cell = header.createCell(i);
+                    cell.setCellValue(headers[i]);
+                    cell.setCellStyle(headerStyle);
+                }
+
+                // evt. auto-size kolonner
+                for (int i = 0; i < headers.length; i++) {
+                    sheet.autoSizeColumn(i);
                 }
 
                 try (OutputStream os = Files.newOutputStream(reportFile)) {
