@@ -1,15 +1,50 @@
 package org.example.app;
 
-import org.example.service.ConverterService;
+import org.example.service.core.ConverterService;
+import org.example.service.reader.PoiExcelReader;
+import org.example.service.report.PoiReportRepository;
+import org.example.service.downloader.SimplePdfDownloader;
+
+import java.nio.file.Path;
+
+/**
+ * Entry point for the application.
+ * Initializes the dependencies and executes the program workflow.
+ */
 
 public class Main {
     public static void main(String[] args) {
 
-        String excelDataPath = "src/main/java/org/example/util/data/GRI_2017_2020_TEST.xlsx";
-        String reportSavePath = "src/main/java/org/example/util/download";
-        String nameOfSavedReport = "Report";
+        // Path to the input Excel file containing BRnum, Pdf_URL, and Html_URL columns.
+        Path excelPath = Path.of("src/main/java/org/example/util/data/GRI_2017_2020_TEST.xlsx");
 
-        ConverterService converter = new ConverterService(excelDataPath, reportSavePath, nameOfSavedReport);
-        converter.executeProgram();
+        // Path to the directory where downloaded PDFs will be stored.
+        Path downloadDir = Path.of("src/main/java/org/example/util/download");
+
+        //Path to the output report Excel file that will be created/updated.
+        Path reportFile = downloadDir.resolve("Report.xlsx");
+
+        ConverterService service = new ConverterService(
+                excelPath,
+                reportFile,
+                downloadDir,
+                new PoiExcelReader(),
+                new SimplePdfDownloader(),
+                new PoiReportRepository()
+        );
+
+        service.executeProgram();
     }
 }
+
+// TODO: Indexes of downloaded pdfs are weird
+// TODO: Check if URL is not too large
+// TODO: Check if URL is corrupted
+// TODO: Check if URL is not empty
+// TODO: Check if PDF is not encrypted
+// TODO: Limit threads
+// TODO: Add threading
+// TODO: Krav spec
+// TODO: Readme.md
+// TODO: Downlaod status to report (look in metadata dataset)
+// TODO: Header row in report

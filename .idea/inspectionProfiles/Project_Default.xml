@@ -1,6 +1,7 @@
 <component name="InspectionProjectProfileManager">
   <profile version="1.0">
     <option name="myName" value="Project Default" />
+    <inspection_tool class="FieldCanBeLocal" enabled="false" level="WARNING" enabled_by_default="false" />
     <inspection_tool class="HttpUrlsUsage" enabled="true" level="WEAK WARNING" enabled_by_default="true">
       <option name="ignoredUrls">
         <list>
@@ -32,6 +33,9 @@
         </list>
       </option>
     </inspection_tool>
+    <inspection_tool class="JavadocDeclaration" enabled="true" level="WARNING" enabled_by_default="true">
+      <option name="ADDITIONAL_TAGS" value="fallback,target" />
+    </inspection_tool>
     <inspection_tool class="SpellCheckingInspection" enabled="false" level="TYPO" enabled_by_default="false">
       <option name="processCode" value="true" />
       <option name="processLiterals" value="true" />
@@ -46,6 +50,7 @@
           <option value="PDF_DOWNLOADER" />
           <option value="PDF_DOWNLOADER" />
           <option value="PDF_DOWNLOADER" />
+          <option value="PDF_DOWNLOADER" />
         </list>
       </option>
       <option name="ignoredPackages">
@@ -54,6 +59,7 @@
           <option value="commons-beanutils:commons-beanutils:1.9.3" />
           <option value="ch.qos.logback:logback-core:1.2.3" />
           <option value="log4j:log4j:1.2.14" />
+          <option value="ch.qos.logback:logback-classic:1.5.6" />
         </list>
       </option>
       <option name="ignoredReasons">
@@ -62,6 +68,7 @@
           <option value="Not exploitable" />
           <option value="Not exploitable" />
           <option value="asdsa" />
+          <option value="Not exploitable" />
         </list>
       </option>
     </inspection_tool>

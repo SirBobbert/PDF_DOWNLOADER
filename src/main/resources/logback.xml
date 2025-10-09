@@ -1,0 +1,24 @@
+<configuration>
+    <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <!-- tid | tråd | farvet level | kort logger | besked + newline -->
+            <pattern>%d{HH:mm:ss} [%thread] %highlight(%-5level) %logger{36} - %msg%n</pattern>
+        </encoder>
+    </appender>
+
+    <logger name="org.apache.poi" level="WARN"/>
+    <logger name="org.jxls" level="WARN"/>
+    <logger name="org.apache.commons" level="WARN"/>
+
+    <!-- Vores egne pakker: normalt INFO. Skift til DEBUG ved behov -->
+    <logger name="org.example.service.downloader" level="INFO"/>
+    <logger name="org.example.service.core" level="INFO"/>
+
+    <root level="INFO">
+        <appender-ref ref="STDOUT"/>
+    </root>
+
+    <root level="WARN">…</root>
+    <logger name="org.example.service.core" level="INFO"/>
+    <logger name="org.example.service.downloader" level="INFO"/>
+</configuration>
