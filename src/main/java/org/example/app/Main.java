@@ -33,18 +33,13 @@ public class Main {
                 new PoiReportRepository()
         );
 
-        service.executeProgram();
+        service.execute();
     }
 }
 
-// TODO: Indexes of downloaded pdfs are weird
 // TODO: Check if URL is not too large
 // TODO: Check if URL is corrupted
-// TODO: Check if URL is not empty
 // TODO: Check if PDF is not encrypted
-// TODO: Limit threads
-// TODO: Add threading
 // TODO: Krav spec
 // TODO: Readme.md
 // TODO: Downlaod status to report (look in metadata dataset)
-// TODO: Header row in report

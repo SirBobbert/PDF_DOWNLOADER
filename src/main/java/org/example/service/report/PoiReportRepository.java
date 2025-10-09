@@ -58,7 +58,7 @@ public class PoiReportRepository implements ReportRepository {
                     cell.setCellStyle(headerStyle);
                 }
 
-                // evt. auto-size kolonner
+                // auto-size kolonner
                 for (int i = 0; i < headers.length; i++) {
                     sheet.autoSizeColumn(i);
                 }
