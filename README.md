@@ -97,15 +97,11 @@ The dataset is located in the `src/main/java/org/example/util` directory, and th
 
 ## UML Diagram
 
-(WIP)
-
-![UML Diagram]()
+![UML_CLASS_DIAGRAM.png](src/main/resources/UML_CLASS_DIAGRAM.png)
 
 ## Requirement Specification
 
-(WIP)
-
-![Requirement Specification]()
+[Requirement Specification (PDF)](src/main/resources/PDF_DOWNLOADER_kravspecifikation.pdf)
 
 ## Tests
 

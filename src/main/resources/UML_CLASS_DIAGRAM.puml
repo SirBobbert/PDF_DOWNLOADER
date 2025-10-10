@@ -1,0 +1,299 @@
+@startuml
+interface org.example.service.reader.ExcelReader {
+~ List<InputRow> readRows(Path)
+}
+note left of org.example.service.reader.ExcelReader::readRows(Path)
+
+     * Reads rows from the given Excel file and extracts BRnum, Pdf_URL and Html_URL if available.
+     *
+     * @param excelPath to the Excel file.
+     * @return list of InputRow objects with parsed data.
+     
+end note
+
+class org.example.service.reader.ExcelReader$InputRow {
+- int rowIndex
+- String BRnum
+- URL pdfUrl
+- URL htmlUrl
+~ <<Create>> InputRow(int,String,URL,URL)
++ String BRnum()
++ URL pdfUrl()
++ URL htmlUrl()
++ int rowIndex()
+}
+note top of org.example.service.reader.ExcelReader$InputRow
+
+     * Simple DTO representing one row of input data.
+     
+end note
+
+
+
+class org.example.service.downloader.SimplePdfDownloader {
+- int connectTimeout
+- int readTimeout
+- {static} Logger log
++ DownloadResult download(String,URL,URL,Path)
+- InputStream open(URL)
+- {static} String labelFor(URL,URL)
+- {static} String shortUrl(URL)
+}
+note left of org.example.service.downloader.SimplePdfDownloader::connectTimeout
+
+     * Timeouts in milliseconds
+     * - connectTimeout: 10 seconds
+     * - readTimeout: 30 seconds
+     
+end note
+
+
+interface org.example.service.downloader.PdfDownloader {
+~ DownloadResult download(String,URL,URL,Path)
+}
+note left of org.example.service.downloader.PdfDownloader::download(String,URL,URL,Path)
+
+     * Attemps to download a PDF from the given URLs.
+     *
+     * @param brNum   - identifier for the row
+     * @param primary - primary PDF URL
+     * @return result object with download outcome
+     * @fallback - optional fallback URL if primary fails
+     * @target - path where the file should be saved
+     
+end note
+
+class org.example.service.downloader.PdfDownloader$DownloadResult {
+- String BRnum
+- URL urlUsed
+- boolean success
+- String reason
+- String errorMessage
+~ <<Create>> DownloadResult(String,URL,boolean,String,String)
++ String reason()
++ URL urlUsed()
++ String BRnum()
++ String errorMessage()
++ boolean success()
+}
+note top of org.example.service.downloader.PdfDownloader$DownloadResult
+
+     * Simple result object for downloading attempt.
+     
+end note
+
+
+
+class org.example.service.core.DownloadTask {
+- int sequence
+- ExcelReader.InputRow row
+- Path targetFile
+- PdfDownloader downloader
++ <<Create>> DownloadTask(int,ExcelReader.InputRow,Path,PdfDownloader)
++ ReportEntity call()
+}
+note top of org.example.service.core.DownloadTask
+
+ * DownloadTask wraps a single row downloaded so it can run in a thread.
+ * Inputs:
+ * - Row meta (index, BRnum, primary/fallback URLs)
+ * - Target file path for the PDF
+ * - PdfDownloader strategy
+ * Output:
+ * - A fully built ReportEntity ready to be appended to the report
+ 
+end note
+
+
+note left of org.example.service.core.DownloadTask::DownloadTask(int,ExcelReader.InputRow,Path,PdfDownloader)
+
+     * Constructs a task with immutable data used by the thread.
+     
+end note
+note right of org.example.service.core.DownloadTask::call()
+
+     * Performs the download and returns the report row descriping the result
+     
+end note
+
+class org.example.app.Main {
++ {static} void main(String[])
+}
+
+interface org.example.service.report.ReportRepository {
+~ void ensureReport(Path)
+~ Set<String> loadExistingBRnums(Path)
+~ void append(Path,List<ReportEntity>)
+}
+
+class org.example.service.report.PoiReportRepository {
++ void ensureReport(Path)
++ Set<String> loadExistingBRnums(Path)
++ void append(Path,List<ReportEntity>)
+}
+
+class org.example.service.reader.PoiExcelReader {
+- {static} String COL_BRNUM
+- {static} String COL_PDF
+- {static} String COL_HTML
++ List<InputRow> readRows(Path)
+- int findColumnIndex(Row,String)
+- boolean isRowBlank(Row)
+- URL urlSafe(String)
+}
+
+
+class org.example.domain.ReportEntity {
+- String BRnum
+- URL url
+- String urlUsed
+- String status
+- String reason
+- String errorMessage
++ String toString()
+}
+
+
+class org.example.service.core.ConverterService {
+- Path excelPath
+- Path reportFile
+- Path downloadDir
+- ExcelReader excelReader
+- PdfDownloader pdfDownloader
+- ReportRepository reportRepository
+- {static} Logger log
++ <<Create>> ConverterService(Path,Path,Path,ExcelReader,PdfDownloader,ReportRepository)
++ void execute()
+- void ensureReport()
+- Set<String> loadExistingBRnums()
+- List<ExcelReader.InputRow> readInputRows()
+- List<ExcelReader.InputRow> prepareWork(List<ExcelReader.InputRow>,Set<String>)
+- int pickPoolSize()
+- ThreadPoolExecutor buildPool(int)
+- RunResults runDownloads(List<ExcelReader.InputRow>,ThreadPoolExecutor)
+- void appendIfAny(List<ReportEntity>)
+- void logSummary(RunResults,ThreadPoolExecutor,int,Duration)
+- void shutdownPool(ThreadPoolExecutor)
+}
+
+note left of org.example.service.core.ConverterService::execute()
+
+     * Executes the main workflow of the application.
+     * Steps:
+     * 1) Ensure report exists.
+     * 2) Load existing BRnums.
+     * 3) Read input rows from Excel.
+     * 4) Filter rows to process.
+     * 5) Create thread pool.
+     * 6) Submit download tasks.
+     * 7) Collect results.
+     * 8) Append new entries to report.
+     * 9) Log summary.
+     * 10) Shutdown thread pool.
+     
+end note
+note right of org.example.service.core.ConverterService::ensureReport()
+
+     * Ensures the report file exists, creating it if it doesn't exist.
+     
+end note
+note left of org.example.service.core.ConverterService::loadExistingBRnums()
+
+     * Load existing BRnums from the report file.
+     * Skips already processed entries.
+     *
+     * @return set of existing BRnums
+     
+end note
+note right of org.example.service.core.ConverterService::readInputRows()
+
+     * Read all rows from the Excel input file.
+     *
+     * @return list of input rows
+     
+end note
+note left of org.example.service.core.ConverterService::prepareWork(List<ExcelReader.InputRow>,Set<String>)
+
+     * Filter out rows that:
+     * - have no URL
+     * - or their BRnum already exists in the report
+     *
+     * @param rows     all rows read from Excel
+     * @param existing BRnums already processed
+     * @return rows that should be processed
+     
+end note
+note right of org.example.service.core.ConverterService::pickPoolSize()
+
+     * Pick pool size based on CPU cores.
+     * Ensures at least 4 and at most 6 threads.
+     *
+     * @return number of threads
+     
+end note
+note left of org.example.service.core.ConverterService::buildPool(int)
+
+     * Build a fixed-size thread pool with custom thread naming and uncaught-exception logging.
+     * Uses CallerRunsPolicy to apply back-pressure on the caller when the queue is full.
+     *
+     * @param size size number of threads
+     * @return configured ThreadPoolExecutor
+     
+end note
+note right of org.example.service.core.ConverterService::runDownloads(List<ExcelReader.InputRow>,ThreadPoolExecutor)
+
+     * Submit download tasks to the pool and collect results.
+     * Logs success/failure of each task.
+     *
+     * @param work rows to process
+     * @param pool thread pool to use
+     * @return RunResults with counts and collected report entries
+     
+end note
+note left of org.example.service.core.ConverterService::appendIfAny(List<ReportEntity>)
+
+     * Append new report entries if there are any.
+     *
+     * @param list entries to append
+     
+end note
+note right of org.example.service.core.ConverterService::logSummary(RunResults,ThreadPoolExecutor,int,Duration)
+
+     * Print summary of run: thread stats, counts, timing, report path.
+     *
+     * @param rr       run results
+     * @param pool     thread pool
+     * @param poolSize configured thread count
+     * @param elapsed  total elapsed time
+     
+end note
+note left of org.example.service.core.ConverterService::shutdownPool(ThreadPoolExecutor)
+
+     * Gracefully shutdown the thread pool.
+     * Fallback to force shutdown if termination times out.
+     *
+     * @param pool thread pool
+     
+end note
+
+class org.example.service.core.ConverterService$RunResults {
+- int ok
+- int fail
+- List<ReportEntity> collected
+- <<Create>> RunResults(int,int,List<ReportEntity>)
++ int fail()
++ List<ReportEntity> collected()
++ int ok()
+}
+
+
+
+
+org.example.service.reader.ExcelReader +.. org.example.service.reader.ExcelReader$InputRow
+org.example.service.downloader.PdfDownloader <|.. org.example.service.downloader.SimplePdfDownloader
+org.example.service.downloader.PdfDownloader +.. org.example.service.downloader.PdfDownloader$DownloadResult
+org.example.service.core.Callable <|.. org.example.service.core.DownloadTask
+org.example.service.report.ReportRepository <|.. org.example.service.report.PoiReportRepository
+org.example.service.reader.ExcelReader <|.. org.example.service.reader.PoiExcelReader
+org.example.service.core.ConverterService +.. org.example.service.core.ConverterService$RunResults
+@enduml
