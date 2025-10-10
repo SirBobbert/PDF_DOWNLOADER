@@ -128,9 +128,7 @@ Robert Pallesen - [GitHub](github.com/SirBobbert)
 
 ## License
 
-This project is licensed under the MIT License - see
-
-the [LICENSE](https://github.com/SirBobbert/PDF_DOWNLOADER/blob/main/LICENSE) file for details.
+This project is licensed under the MIT License - see the [LICENSE](https://github.com/SirBobbert/PDF_DOWNLOADER/blob/main/LICENSE) file for details.
 
 ## Version History
 
