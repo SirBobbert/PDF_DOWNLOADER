@@ -14,7 +14,7 @@
 
 ### Installing and Running
 
-### Tests Tests
+### Tests
 
 ## Help
 
