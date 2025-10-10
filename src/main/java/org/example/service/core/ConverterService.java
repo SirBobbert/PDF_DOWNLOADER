@@ -292,7 +292,7 @@ public class ConverterService {
                         - Total rows considered   : {}
                         - Downloads succeeded     : {}
                         - Downloads failed        : {}
-                        - Elapsed                 : {} ms
+                        - Elapsed                 : {} seconds
                         - Report path             : {}
                         ===============================================================================
                         """,
@@ -301,7 +301,7 @@ public class ConverterService {
                 rr.ok + rr.fail,
                 rr.ok,
                 rr.fail,
-                elapsed.toMillis(),
+                elapsed.toSeconds(),
                 reportFile
         );
     }
