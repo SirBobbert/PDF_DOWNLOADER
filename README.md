@@ -103,6 +103,9 @@ The dataset is located in the `src/main/java/org/example/util` directory, and th
 
 [Requirement Specification (PDF)](src/main/resources/PDF_DOWNLOADER_kravspecifikation.pdf)
 
+## Assignment
+[Assignment (PDF)](src/main/resources/PDF_Downloader_Assignment.pdf)
+
 ## Tests
 
 The project includes unit tests to ensure the functionality of key components. Tests are located in the `src/test/java`
